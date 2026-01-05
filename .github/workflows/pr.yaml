@@ -1,4 +1,3 @@
----
 name: "PR workflow"
 
 on:
@@ -38,9 +37,8 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      # 定义两个输出变量供后面判断
       android: ${{ steps.filter.outputs.android }}
-      all: ${{ steps.filter.outputs.all }}
+      flutter: ${{ steps.filter.outputs.flutter }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -50,16 +48,15 @@ jobs:
           filters: |
             android:
               - 'android/**'
-            # 添加 'all' 过滤器，包含 Dart 代码和配置文件的修改
-            all:
+            flutter:
               - 'lib/**'
               - 'pubspec.yaml'
               - 'assets/**'
 
   flutter-build-android:
     needs: changes
-    # 逻辑修正：如果手动触发 OR (不是草稿 AND (改了安卓原生配置 OR 改了通用代码))
-    if: ${{ github.event.inputs.run_android || (! github.event.pull_request.draft && (needs.changes.outputs.android == 'true' || needs.changes.outputs.all == 'true')) }}
+    # 逻辑：如果是手动触发 OR (不是草稿 AND (修改了安卓原生配置 OR 修改了Flutter业务代码))
+    if: ${{ github.event.inputs.run_android || (! github.event.pull_request.draft && (needs.changes.outputs.android == 'true' || needs.changes.outputs.flutter == 'true')) }}
     name: "Release for android"
     runs-on: "ubuntu-latest"
     permissions: write-all
@@ -94,21 +91,29 @@ jobs:
         shell: bash
         
       - name: Build Flutter for Android
-        # 核心修改：指定 target-platform 并开启 split-per-abi
-        # 这将生成 app-armeabi-v7a-release.apk 和 app-arm64-v8a-release.apk
+        # 指定只构建 arm (v7a) 和 arm64 (v8a)
         run: flutter build apk --split-per-abi --target-platform android-arm,android-arm64
         shell: bash
         
       - name: Package android build output
-        # 重命名并移动文件
+        # 将生成的两个包重命名并移动，方便后续上传
         run: |
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Kazumi_android_canary_v7a.apk
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Kazumi_android_canary_v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Kazumi_canary_v7a.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Kazumi_canary_v8a.apk
         shell: bash
 
-      - name: Upload android outputs
+      # 步骤1：单独上传 v7a
+      - name: Upload android v7a output
         uses: actions/upload-artifact@v4
         with:
-          name: android_outputs
-          path: Kazumi_android_*.apk
-          retention-days: 3 # 建议添加：保留3天，节省空间
+          name: Kazumi_canary_v7a
+          path: Kazumi_canary_v7a.apk
+          retention-days: 3
+
+      # 步骤2：单独上传 v8a
+      - name: Upload android v8a output
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kazumi_canary_v8a
+          path: Kazumi_canary_v8a.apk
+          retention-days: 3
