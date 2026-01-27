@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/bean/card/bangumi_card.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -19,11 +20,13 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final SearchController searchController = SearchController();
+  final FocusNode _searchBarFocusNode = FocusNode();
 
-  /// Don't use modular singleton here. We may have multiple search pages.
-  /// Use a new instance of SearchPageController for each search page.
   final SearchPageController searchPageController = SearchPageController();
   final ScrollController scrollController = ScrollController();
+
+  // 控制当前显示的是“建议/历史”还是“搜索结果”
+  bool _showSuggestions = true;
 
   final List<Tab> tabs = [
     Tab(text: "排序方式"),
@@ -35,17 +38,28 @@ class _SearchPageState extends State<SearchPage> {
     super.initState();
     scrollController.addListener(scrollListener);
     searchPageController.loadSearchHistories();
+
+    // 监听焦点变化，当搜索框重新获得焦点时，显示建议列表
+    _searchBarFocusNode.addListener(() {
+      if (_searchBarFocusNode.hasFocus) {
+        setState(() {
+          _showSuggestions = true;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     searchPageController.bangumiList.clear();
     scrollController.removeListener(scrollListener);
+    _searchBarFocusNode.dispose();
     super.dispose();
   }
 
   void scrollListener() {
-    if (scrollController.position.pixels >=
+    if (scrollController.hasClients &&
+        scrollController.position.pixels >=
             scrollController.position.maxScrollExtent - 200 &&
         !searchPageController.isLoading &&
         searchController.text != '' &&
@@ -53,6 +67,21 @@ class _SearchPageState extends State<SearchPage> {
       KazumiLogger().i('SearchController: search results is loading more');
       searchPageController.searchBangumi(searchController.text, type: 'add');
     }
+  }
+
+  // 执行搜索的统一入口
+  void _performSearch(String keyword) {
+    if (keyword.isEmpty) return;
+    
+    // 收起键盘（如果是软键盘）
+    _searchBarFocusNode.unfocus();
+    
+    setState(() {
+      _showSuggestions = false; // 隐藏建议，显示结果
+      searchController.text = keyword; // 确保输入框文字同步
+    });
+    
+    searchPageController.searchBangumi(keyword, type: 'init');
   }
 
   Widget showFilterSwitcher() {
@@ -106,30 +135,27 @@ class _SearchPageState extends State<SearchPage> {
               title: const Text('按热度排序'),
               onTap: () {
                 Navigator.pop(context);
-                searchController.text = searchPageController.attachSortParams(
+                final newText = searchPageController.attachSortParams(
                     searchController.text, 'heat');
-                searchPageController.searchBangumi(searchController.text,
-                    type: 'init');
+                _performSearch(newText);
               },
             ),
             ListTile(
               title: const Text('按评分排序'),
               onTap: () {
                 Navigator.pop(context);
-                searchController.text = searchPageController.attachSortParams(
+                final newText = searchPageController.attachSortParams(
                     searchController.text, 'rank');
-                searchPageController.searchBangumi(searchController.text,
-                    type: 'init');
+                _performSearch(newText);
               },
             ),
             ListTile(
               title: const Text('按匹配程度排序'),
               onTap: () {
                 Navigator.pop(context);
-                searchController.text = searchPageController.attachSortParams(
+                final newText = searchPageController.attachSortParams(
                     searchController.text, 'match');
-                searchPageController.searchBangumi(searchController.text,
-                    type: 'init');
+                _performSearch(newText);
               },
             ),
           ],
@@ -165,10 +191,12 @@ class _SearchPageState extends State<SearchPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.inputTag != '') {
         final String tagString = 'tag:${Uri.decodeComponent(widget.inputTag)}';
-        searchController.text = tagString;
-        searchPageController.searchBangumi(tagString, type: 'init');
+        if (searchController.text != tagString) {
+           _performSearch(tagString);
+        }
       }
     });
+
     return Scaffold(
       appBar: SysAppBar(
         backgroundColor: Colors.transparent,
@@ -203,151 +231,192 @@ class _SearchPageState extends State<SearchPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-            child: FocusScope(
-              descendantsAreFocusable: false,
-              child: SearchAnchor.bar(
-                searchController: searchController,
-                barElevation: WidgetStateProperty<double>.fromMap(
-                  <WidgetStatesConstraint, double>{WidgetState.any: 0},
-                ),
-                viewElevation: 0,
-                viewLeading: IconButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                  FocusScope.of(context).nextFocus();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: SearchBar(
+                controller: searchController,
+                focusNode: _searchBarFocusNode,
+                
+                // 修改点 1: 还原搜索图标
+                leading: const Icon(Icons.search),
+                
+                // 修改点 2: 恢复背景色逻辑 (选中时高亮，平时默认)
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) {
+                    if (states.contains(WidgetState.focused)) {
+                       // 选中时的颜色
+                      return Theme.of(context).highlightColor.withOpacity(0.2) == Colors.transparent 
+                          ? Colors.white24 
+                          : Theme.of(context).highlightColor;
+                    }
+                    // 默认颜色 (返回 null 让组件使用默认主题色，通常是 Surface 颜色)
+                    return null;
                   },
-                  icon: Icon(Icons.arrow_back),
                 ),
-                isFullScreen: MediaQuery.sizeOf(context).width <
-                    LayoutBreakpoint.compact['width']!,
-                suggestionsBuilder: (context, controller) => [
-                  Observer(
-                    builder: (context) {
-                      if (controller.text.isNotEmpty) {
-                        return Container(
-                          height: 400,
-                          alignment: Alignment.center,
-                          child: Text("无可用搜索建议，回车以直接检索"),
-                        );
-                      } else {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (var history in searchPageController
-                                .searchHistories
-                                .take(10))
-                              ListTile(
-                                title: Text(history.keyword),
-                                onTap: () {
-                                  controller.text = history.keyword;
-                                  searchPageController.searchBangumi(
-                                      controller.text,
-                                      type: 'init');
-                                  if (searchController.isOpen) {
-                                    searchController.closeView(history.keyword);
-                                  }
-                                },
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () {
-                                    searchPageController
-                                        .deleteSearchHistory(history);
-                                  },
-                                ),
-                              ),
-                          ],
-                        );
-                      }
-                    },
-                  ),
+                elevation: WidgetStateProperty.all(0), // 保持扁平化
+                
+                trailing: [
+                  if (searchController.text.isNotEmpty)
+                    IconButton(
+                      onPressed: () {
+                        searchController.clear();
+                        setState(() {
+                          _showSuggestions = true;
+                        });
+                        _searchBarFocusNode.requestFocus();
+                      },
+                      icon: const Icon(Icons.clear),
+                    ),
                 ],
-                onSubmitted: (value) {
-                  searchPageController.searchBangumi(value, type: 'init');
-                  if (searchController.isOpen) {
-                    searchController.closeView(value);
+                hintText: '搜索番剧...',
+                onChanged: (value) {
+                  if (!_showSuggestions) {
+                    setState(() {
+                      _showSuggestions = true;
+                    });
                   }
+                },
+                onSubmitted: (value) {
+                  _performSearch(value);
                 },
               ),
             ),
           ),
+          
           Expanded(
-            child: Observer(builder: (context) {
-              if (searchPageController.isTimeOut) {
-                return Center(
-                  child: SizedBox(
-                    height: 400,
-                    child: GeneralErrorWidget(
-                      errMsg: '什么都没有找到 (´;ω;`)',
-                      actions: [
-                        GeneralErrorButton(
-                          onPressed: () {
-                            searchPageController.searchBangumi(
-                                searchController.text,
-                                type: 'init');
-                          },
-                          text: '点击重试',
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-
-              if (searchPageController.isLoading &&
-                  searchPageController.bangumiList.isEmpty) {
-                return Center(child: CircularProgressIndicator());
-              }
-              int crossCount = 3;
-              if (MediaQuery.sizeOf(context).width >
-                  LayoutBreakpoint.compact['width']!) {
-                crossCount = 5;
-              }
-              if (MediaQuery.sizeOf(context).width >
-                  LayoutBreakpoint.medium['width']!) {
-                crossCount = 6;
-              }
-              List<BangumiItem> filteredList = searchPageController.bangumiList.toList();
-
-              if (searchPageController.notShowWatchedBangumis) {
-                final watchedBangumiIds = searchPageController.loadWatchedBangumiIds();
-                filteredList = filteredList
-                    .where((item) => !watchedBangumiIds.contains(item.id))
-                    .toList();
-              }
-
-              if (searchPageController.notShowAbandonedBangumis) {
-                final abandonedBangumiIds = searchPageController.loadAbandonedBangumiIds();
-                filteredList = filteredList
-                    .where((item) => !abandonedBangumiIds.contains(item.id))
-                    .toList();
-              }
-
-              return GridView.builder(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  mainAxisSpacing: StyleString.cardSpace - 2,
-                  crossAxisSpacing: StyleString.cardSpace,
-                  crossAxisCount: crossCount,
-                  mainAxisExtent:
-                      MediaQuery.of(context).size.width / crossCount / 0.65 +
-                          MediaQuery.textScalerOf(context).scale(32.0),
-                ),
-                itemCount: filteredList.isNotEmpty ? filteredList.length : 10,
-                itemBuilder: (context, index) {
-                  return filteredList.isNotEmpty
-                      ? BangumiCardV(
-                          enableHero: false,
-                          bangumiItem: filteredList[index],
-                        )
-                      : Container();
-                },
-              );
-            }),
+            child: _showSuggestions ? _buildSuggestionsList() : _buildSearchResultsGrid(),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildSuggestionsList() {
+    return Observer(
+      builder: (context) {
+        if (searchPageController.searchHistories.isEmpty) {
+          return Center(
+            child: Text(
+              "暂无搜索历史",
+              style: TextStyle(color: Theme.of(context).hintColor),
+            ),
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          children: [
+            for (var history in searchPageController.searchHistories.take(10))
+              ListTile(
+                leading: const Icon(Icons.history),
+                title: Text(history.keyword),
+                onTap: () {
+                  _performSearch(history.keyword);
+                },
+                trailing: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    searchPageController.deleteSearchHistory(history);
+                  },
+                ),
+              ),
+            if (searchPageController.searchHistories.isNotEmpty)
+              TextButton.icon(
+                onPressed: () {
+                  searchPageController.clearSearchHistory();
+                },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text("清空搜索历史"),
+              )
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchResultsGrid() {
+    return Observer(builder: (context) {
+      if (searchPageController.isTimeOut) {
+        return Center(
+          child: SizedBox(
+            height: 400,
+            child: GeneralErrorWidget(
+              errMsg: '什么都没有找到 (´;ω;`)',
+              actions: [
+                GeneralErrorButton(
+                  onPressed: () {
+                    searchPageController.searchBangumi(
+                        searchController.text,
+                        type: 'init');
+                  },
+                  text: '点击重试',
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (searchPageController.isLoading &&
+          searchPageController.bangumiList.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      int crossCount = 3;
+      if (MediaQuery.sizeOf(context).width >
+          LayoutBreakpoint.compact['width']!) {
+        crossCount = 5;
+      }
+      if (MediaQuery.sizeOf(context).width >
+          LayoutBreakpoint.medium['width']!) {
+        crossCount = 6;
+      }
+      List<BangumiItem> filteredList =
+          searchPageController.bangumiList.toList();
+
+      if (searchPageController.notShowWatchedBangumis) {
+        final watchedBangumiIds =
+            searchPageController.loadWatchedBangumiIds();
+        filteredList = filteredList
+            .where((item) => !watchedBangumiIds.contains(item.id))
+            .toList();
+      }
+
+      if (searchPageController.notShowAbandonedBangumis) {
+        final abandonedBangumiIds =
+            searchPageController.loadAbandonedBangumiIds();
+        filteredList = filteredList
+            .where((item) => !abandonedBangumiIds.contains(item.id))
+            .toList();
+      }
+
+      return GridView.builder(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 80),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          mainAxisSpacing: StyleString.cardSpace - 2,
+          crossAxisSpacing: StyleString.cardSpace,
+          crossAxisCount: crossCount,
+          mainAxisExtent:
+              MediaQuery.of(context).size.width / crossCount / 0.65 +
+                  MediaQuery.textScalerOf(context).scale(32.0),
+        ),
+        itemCount: filteredList.isNotEmpty ? filteredList.length : 0,
+        itemBuilder: (context, index) {
+          return filteredList.isNotEmpty
+              ? BangumiCardV(
+                  enableHero: false,
+                  bangumiItem: filteredList[index],
+                )
+              : Container();
+        },
+      );
+    });
   }
 }
