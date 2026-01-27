@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/pages/router.dart';
@@ -17,9 +18,7 @@ class NavigationBarState extends ChangeNotifier {
   bool _isBottom = false;
 
   int get selectedIndex => _selectedIndex;
-
   bool get isHide => _isHide;
-
   bool get isBottom => _isBottom;
 
   void updateSelectedIndex(int pageIndex) {
@@ -40,6 +39,17 @@ class NavigationBarState extends ChangeNotifier {
 
 class _ScaffoldMenu extends State<ScaffoldMenu> {
   final PageController _page = PageController();
+
+  // 定义两个焦点作用域节点，分别管理 菜单区 和 内容区
+  final FocusScopeNode _menuScopeNode = FocusScopeNode();
+  final FocusScopeNode _contentScopeNode = FocusScopeNode();
+
+  @override
+  void dispose() {
+    _menuScopeNode.dispose();
+    _contentScopeNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,69 +114,134 @@ class _ScaffoldMenu extends State<ScaffoldMenu> {
       backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       body: Row(
         children: [
+          // ==================================================
+          // 左侧菜单区域
+          // ==================================================
           EmbeddedNativeControlArea(
-            child: Visibility(
-              visible: !state.isHide,
-              child: NavigationRail(
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-                groupAlignment: 1.0,
-                leading: FloatingActionButton(
-                  elevation: 0,
-                  heroTag: null,
-                  onPressed: () {
-                    Modular.to.pushNamed('/search/');
+            child: FocusScope(
+              node: _menuScopeNode,
+              // 【菜单右键逻辑】：强制寻找右侧第一个控件（重置焦点位置）
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                  
+                  final policy = FocusTraversalGroup.of(context);
+                  
+                  // 寻找内容区内的第一个可聚焦元素（通常是 Grid 左上角的卡片）
+                  final firstFocusable = policy.findFirstFocus(_contentScopeNode);
+
+                  if (firstFocusable != null) {
+                    firstFocusable.requestFocus();
+                  } else {
+                    // 如果右侧内容为空，保底聚焦到 Scope 本身
+                    _contentScopeNode.requestFocus();
+                  }
+                  
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: Visibility(
+                visible: !state.isHide,
+                child: NavigationRail(
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                  groupAlignment: 1.0,
+                  leading: FloatingActionButton(
+                    elevation: 0,
+                    heroTag: null,
+                    onPressed: () {
+                      Modular.to.pushNamed('/search/');
+                    },
+                    child: const Icon(Icons.search),
+                  ),
+                  labelType: NavigationRailLabelType.selected,
+                  destinations: const <NavigationRailDestination>[
+                    NavigationRailDestination(
+                      selectedIcon: Icon(Icons.home),
+                      icon: Icon(Icons.home_outlined),
+                      label: Text('推荐'),
+                    ),
+                    NavigationRailDestination(
+                      selectedIcon: Icon(Icons.timeline),
+                      icon: Icon(Icons.timeline_outlined),
+                      label: Text('时间表'),
+                    ),
+                    NavigationRailDestination(
+                      selectedIcon: Icon(Icons.favorite),
+                      icon: Icon(Icons.favorite_border),
+                      label: Text('追番'),
+                    ),
+                    NavigationRailDestination(
+                      selectedIcon: Icon(Icons.settings),
+                      icon: Icon(Icons.settings_outlined),
+                      label: Text('我的'),
+                    ),
+                  ],
+                  selectedIndex: state.selectedIndex,
+                  onDestinationSelected: (int index) {
+                    state.updateSelectedIndex(index);
+                    Modular.to.navigate("/tab${menu.getPath(index)}/");
                   },
-                  child: const Icon(Icons.search),
                 ),
-                labelType: NavigationRailLabelType.selected,
-                destinations: const <NavigationRailDestination>[
-                  NavigationRailDestination(
-                    selectedIcon: Icon(Icons.home),
-                    icon: Icon(Icons.home_outlined),
-                    label: Text('推荐'),
-                  ),
-                  NavigationRailDestination(
-                    selectedIcon: Icon(Icons.timeline),
-                    icon: Icon(Icons.timeline_outlined),
-                    label: Text('时间表'),
-                  ),
-                  NavigationRailDestination(
-                    selectedIcon: Icon(Icons.favorite),
-                    icon: Icon(Icons.favorite_border),
-                    label: Text('追番'),
-                  ),
-                  NavigationRailDestination(
-                    selectedIcon: Icon(Icons.settings),
-                    icon: Icon(Icons.settings_outlined),
-                    label: Text('我的'),
-                  ),
-                ],
-                selectedIndex: state.selectedIndex,
-                onDestinationSelected: (int index) {
-                  state.updateSelectedIndex(index);
-                  Modular.to.navigate("/tab${menu.getPath(index)}/");
-                },
               ),
             ),
           ),
+          
+          // ==================================================
+          // 右侧内容区域
+          // ==================================================
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16.0),
-                  bottomLeft: Radius.circular(16.0),
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16.0),
-                  bottomLeft: Radius.circular(16.0),
-                ),
-                child: PageView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: menu.size,
-                  itemBuilder: (_, __) => const RouterOutlet(),
+            child: FocusScope(
+              node: _contentScopeNode,
+              // 【内容左键逻辑】：智能判断
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                  
+                  // 1. 获取当前真正拥有焦点的“叶子节点”（例如 Grid 中的某张卡片）
+                  final currentFocus = FocusManager.instance.primaryFocus;
+
+                  // 2. 以这个叶子节点的视角，尝试向左寻找下一个焦点
+                  // 这种方式可以穿透嵌套的 Scaffold/PageView 结构
+                  bool didMove = false;
+                  if (currentFocus != null) {
+                    didMove = currentFocus.focusInDirection(TraversalDirection.left);
+                  }
+
+                  // 3. 结果判断
+                  if (didMove) {
+                    // 如果成功移动了（说明还在网格内部），则不做其他处理
+                    return KeyEventResult.handled;
+                  } else {
+                    // 如果无法移动（说明到了网格的最左边缘），则跳回菜单
+                    _menuScopeNode.requestFocus();
+                    return KeyEventResult.handled;
+                  }
+                }
+                return KeyEventResult.ignored;
+              },
+              // 保持 Group 以确保内部导航连贯
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(), 
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16.0),
+                      bottomLeft: Radius.circular(16.0),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16.0),
+                      bottomLeft: Radius.circular(16.0),
+                    ),
+                    child: PageView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: menu.size,
+                      itemBuilder: (_, __) => const RouterOutlet(),
+                    ),
+                  ),
                 ),
               ),
             ),
