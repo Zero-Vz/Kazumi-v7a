@@ -1,14 +1,11 @@
 # Kazumi
-使用 Flutter 开发的基于自定义规则的番剧采集与在线观看程序。使用最多五行基于 `Xpath` 语法的选择器构建自己的规则。支持规则导入与规则分享。支持基于 `Anime4K` 的实时超分辨率。绝赞开发中 (～￣▽￣)～
+根据`Predidit/Kazumi`项目修改成适用于Android v7a的TV端版本
+使用 Flutter 开发的基于自定义规则的番剧采集与在线观看程序。
+使用最多五行基于 `Xpath` 语法的选择器构建自己的规则。支持规则导入与规则分享。支持基于 `Anime4K` 的实时超分辨率。绝赞开发中 (～￣▽￣)～
 
 ## 支持平台
 
-- Android 10 及以上
-- Windows 10 及以上
-- MacOS 10.15 及以上
-- Linux (实验性)
-- iOS 13 及以上 (需要[自签名](https://kazumi.app/docs/misc/how-to-install-in-ios.html))
-- HarmonyOS 5.0 及以上 (位于[分支仓库](https://github.com/ErBWs/Kazumi/releases/latest)，需要[侧载](https://kazumi.app/docs/misc/how-to-install-in-ohos.html))
+Android v7a TV端
 
 ## 屏幕截图 
 
@@ -55,46 +52,14 @@
 
 ## 下载
 
-通过本页面 [releases](https://github.com/Predidit/Kazumi/releases) 选项卡下载：
+通过本页面 [Actions](https://github.com/Zero-Vz/Kazumi_TV-v7a/actions) 中的PR workflow选项卡下载：
 
-<a href="https://github.com/Predidit/Kazumi/releases">
+<a href="https://github.com/Zero-Vz/Kazumi_TV-v7a/actions">
   <img src="static/svg/get_it_on_github.svg" alt="Get it on Github" width="200"/>
 </a>
 
-### Android
 
-<a href="https://f-droid.org/packages/com.predidit.kazumi">
-  <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on-en-us.svg"
-  alt="Get it on F-Droid" width="200">
-</a>
 
-### GNU/Linux
-
-&nbsp;&nbsp;
-<a href="https://flathub.org/apps/io.github.Predidit.Kazumi">
-  <img src="https://flathub.org/api/badge?svg&locale=en" alt="Get it on Flathub" width="175"/>
-</a>
-
-#### Arch Linux
-
-可以从 [AUR](http://aur.archlinux.org) 或 [archlinuxcn](https://github.com/archlinuxcn/repo) 安装。
-
-##### AUR
-
-```bash
-[yay/paru] -S kazumi # 从源码构建
-[yay/paru] -S kazumi-bin # 二进制包
-```
-
-##### archlinuxcn
-
-```bash
-sudo pacman -S kazumi
-```
-
-## 贡献
-
-欢迎向我们的 [规则仓库](https://github.com/Predidit/KazumiRules) 提交您的自定义规则。您可以自由选择是否在规则中留下您的ID
 
 ## Q&A
 
@@ -116,10 +81,6 @@ A: 本程序在视频播放时, 会尽可能多地缓存视频到内存, 以提�
 #### Q: 为什么少数番剧无法通过外部播放器观看？
 
 A: 部分视频源的番剧使用了反盗链措施, 这可以被 Kazumi 解决, 但无法被外部播放器解决。
-
-#### Q: 为什么下载的 Linux 版本缺少图标和托盘功能？
-
-A: 使用 .deb 版本进行安装, tar.gz 版本仅为方便二次打包, 这一格式先天缺乏图标和托盘功能支持。
 
 </details>
 
@@ -145,49 +106,6 @@ A: 本项目编译需要良好的网络环境, 除了由 Google 托管的 Flutte
 
 </details>
 
-## 美术资源
-
-本项目图标来自 [Yuquanaaa](https://www.pixiv.net/users/66219277) 发表在 [Pixiv](https://www.pixiv.net/artworks/116666979) 上的作品。
-
-此图标由其原作者 [Yuquanaaa](https://www.pixiv.net/users/66219277) 拥有版权。我们已获得原作者的授权和许可, 可以在本项目中使用这一图标。这一图标不是自由使用的, 未经原作者明确授权, 任何人不得擅自使用、复制、修改或分发这一图标。
-
-本项目内嵌字体为 [Mi Sans](https://hyperos.mi.com/font/en/details/sc/) 字体, 由 [Xiaomi](https://www.mi.com/) 开发和拥有版权。
-
-## 免责声明
-
-本项目基于 GNU 通用公共许可证第 3 版（GPL-3.0）授权。我们不对其适用性、可靠性或准确性作出任何明示或暗示的保证。在法律允许的最大范围内, 作者和贡献者不承担任何因使用本软件而产生的直接、间接、偶然、特殊或后果性的损害赔偿责任。
-
-使用本项目需遵守所在地法律法规, 不得进行任何侵犯第三方知识产权的行为。因使用本项目而产生的数据和缓存应在24小时内清除, 超出 24 小时的使用需获得相关权利人的授权。
-
-## 隐私政策 (Privacy policy)
-
-我们不收集任何用户数据, 不使用任何遥测组件。
-
-## 代码签名策略 (Code signing policy)
-提交者: [Contributors](https://github.com/Predidit/Kazumi/graphs/contributors)
-审阅者: [Owner](https://github.com/Predidit)
-
-## 赞助 (Sponsors)
-| ![signpath](https://signpath.org/assets/favicon-50x50.png) | Free code signing on Windows provided by [SignPath.io](https://about.signpath.io/), certficate by [SignPath Foundation](https://signpath.org/) |
-|------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-
-## 致谢
-
-特别感谢 [XpathSelector](https://github.com/simonkimi/xpath_selector) 这个优秀的项目是本项目的基石。
-
-特别感谢 [DandanPlayer](https://www.dandanplay.com/) 本项目使用了 dandanplayer 开放 API 以提供弹幕交互。
-
-特别感谢 [Bangumi](https://bangumi.tv/) 本项目使用了 Bangumi 开放 API 以提供番剧元数据。
-
-特别感谢 [Anime4K](https://github.com/bloc97/Anime4K) 本项目使用 Anime4K 进行实时超分。
-
-特别感谢 [SyncPlay](https://github.com/Syncplay/syncplay) 本项目使用 SyncPlay 协议并通过 SyncPlay 公共服务器实现一起看功能。
-
-感谢 [media-kit](https://github.com/media-kit/media-kit) 本项目跨平台媒体播放能力来自 media-kit。
-
-感谢 [avbuild](https://github.com/wang-bin/avbuild) 本项目使用了来自 avbuild 的树外补丁实现非标准视频流播放。
-
-感谢 [hive](https://github.com/isar/hive) 本项目持久化储存能力来自 hive。
 
 
 
